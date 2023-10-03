@@ -7,3 +7,7 @@
 
 2 cách sử dụng form:
 - Uncontrolled component: sử dụng ref
+
+
+# Exercise:
+- Điểm cho user khi mà hoàn thành bài quiz

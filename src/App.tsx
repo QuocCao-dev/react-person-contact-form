@@ -7,10 +7,13 @@ import {
   NextUIProvider,
   Select,
   SelectItem,
+  Spinner,
 } from "@nextui-org/react";
 import { useForm } from "react-hook-form";
 import axios from "axios";
 import { useState } from "react";
+import { shuffle } from "lodash";
+import { Question } from "./types/question";
 
 /**
  *
@@ -66,7 +69,12 @@ function App() {
     },
   });
   const { register, getValues } = form;
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [step, setStep] = useState<"config" | "do-test">("config");
+
+  const currentQuestion = questions[currentIdx];
 
   const fetchQuestions = async ({
     amount,
@@ -77,6 +85,7 @@ function App() {
     category: string;
     difficulty: string;
   }) => {
+    setLoading(true);
     const response = await axios.get("https://opentdb.com/api.php", {
       params: {
         amount,
@@ -85,7 +94,17 @@ function App() {
       },
     });
 
-    setQuestions(response?.data?.results || []);
+    const formatQuestions = response?.data?.results?.map((question: any) => ({
+      ...question,
+      questions: shuffle([
+        ...question.incorrect_answers,
+        question.correct_answer,
+      ]),
+    }));
+
+    setQuestions(formatQuestions);
+    setLoading(false);
+    setStep("do-test");
   };
 
   const handleSubmitForm = (e: any) => {
@@ -94,48 +113,86 @@ function App() {
     fetchQuestions({ amount, category, difficulty });
   };
 
+  const handleNextQuestion = () => {
+    setCurrentIdx((prev) => prev + 1);
+  };
+
+  const handleAnswerQuestion = (question: string) => {
+    const isCorrect = question === currentQuestion.correct_answer;
+    if (isCorrect) {
+      alert("Correct answer");
+    } else {
+      alert("Wrong answer");
+    }
+
+    setCurrentIdx((prev) => prev + 1);
+  };
+
   return (
     <NextUIProvider>
       <div className="flex items-center justify-center min-h-screen bg-slate-800">
-        <Card className="w-[500px]">
-          <CardHeader>Setup Quiz</CardHeader>
+        {loading ? (
+          <Spinner color="warning" label="Loading..." />
+        ) : (
+          <>
+            {/* Config question */}
+            {step === "config" && (
+              <Card className="w-[500px]">
+                <CardHeader>Setup Quiz</CardHeader>
 
-          <CardBody>
-            <form className="space-y-4" onSubmit={handleSubmitForm}>
-              <Input
-                label="Number Of Questions"
-                size="sm"
-                {...register("amount")}
-              />
-              <Select
-                label="Category"
-                {...register("category")}
-                defaultSelectedKeys={[DEFAULT_CATEGORY]}
-              >
-                {CATEGORIES.map((day) => (
-                  <SelectItem key={day.value} value={day.value}>
-                    {day.label}
-                  </SelectItem>
-                ))}
-              </Select>
-              <Select
-                label="difficulty"
-                {...register("difficulty")}
-                defaultSelectedKeys={[DEFAULT_DIFFICULTY]}
-              >
-                {DIFFICULTIES.map((day) => (
-                  <SelectItem key={day.value} value={day.value}>
-                    {day.label}
-                  </SelectItem>
-                ))}
-              </Select>
+                <CardBody>
+                  <form className="space-y-4" onSubmit={handleSubmitForm}>
+                    <Input
+                      label="Number Of Questions"
+                      size="sm"
+                      {...register("amount")}
+                    />
+                    <Select
+                      label="Category"
+                      {...register("category")}
+                      defaultSelectedKeys={[DEFAULT_CATEGORY]}
+                    >
+                      {CATEGORIES.map((day) => (
+                        <SelectItem key={day.value} value={day.value}>
+                          {day.label}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                    <Select
+                      label="difficulty"
+                      {...register("difficulty")}
+                      defaultSelectedKeys={[DEFAULT_DIFFICULTY]}
+                    >
+                      {DIFFICULTIES.map((day) => (
+                        <SelectItem key={day.value} value={day.value}>
+                          {day.label}
+                        </SelectItem>
+                      ))}
+                    </Select>
 
-              <Button type="submit" color="primary">
-                Submit
-              </Button>
-            </form>
-          </CardBody>
-        </Card>
+                    <Button type="submit" color="primary">
+                      Submit
+                    </Button>
+                  </form>
+                </CardBody>
+              </Card>
+            )}
+            {/* load questions */}
+            {step === "do-test" && (
+              <div>
+                <div className="text-white">{currentQuestion?.question}</div>
+                {currentQuestion?.questions.map((question) => (
+                  <Card>
+                    <CardBody onClick={() => handleAnswerQuestion(question)}>
+                      <p>{question}</p>
+                    </CardBody>
+                  </Card>
+                ))}
+                <Button onClick={handleNextQuestion}>Next Question</Button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </NextUIProvider>
   );
